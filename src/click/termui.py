@@ -196,7 +196,7 @@ def prompt(
 
 def confirm(
     text: str,
-    default: bool | None = False,
+    default: bool | None = True,
     abort: bool = False,
     prompt_suffix: str = ": ",
     show_default: bool = True,
@@ -208,14 +208,19 @@ def confirm(
     function will catch it and raise a :exc:`Abort` exception.
 
     :param text: the question to ask.
-    :param default: The default value to use when no input is given. If
-        ``None``, repeat until input is given.
+    :param default: The default value to use when no input is given.
+        Defaults to ``True``, which shows ``[Y/n]`` in the prompt.
+        If ``None``, repeat until input is given, showing ``[y/n]``.
     :param abort: if this is set to `True` a negative answer aborts the
                   exception by raising :exc:`Abort`.
     :param prompt_suffix: a suffix that should be added to the prompt.
     :param show_default: shows or hides the default value in the prompt.
     :param err: if set to true the file defaults to ``stderr`` instead of
                 ``stdout``, the same as with echo.
+
+    .. versionchanged:: X.X
+        The default value changed from ``False`` to ``True``, so the
+        prompt now shows ``[Y/n]`` by default instead of ``[y/N]``.
 
     .. versionchanged:: 8.3.1
         A space is no longer appended to the prompt.
