@@ -176,34 +176,34 @@ def test_prompts(runner):
 
     result = runner.invoke(test, input="y\n")
     assert not result.exception
-    assert result.output == "Foo [y/N]: y\nyes!\n"
+    assert result.output == "Foo [Y/n]: y\nyes!\n"
 
     result = runner.invoke(test, input="\n")
     assert not result.exception
-    assert result.output == "Foo [y/N]: \nno :(\n"
+    assert result.output == "Foo [Y/n]: \nyes!\n"
 
     result = runner.invoke(test, input="n\n")
     assert not result.exception
-    assert result.output == "Foo [y/N]: n\nno :(\n"
+    assert result.output == "Foo [Y/n]: n\nno :(\n"
 
     @click.command()
     def test_no():
-        if click.confirm("Foo", default=True):
+        if click.confirm("Foo", default=False):
             click.echo("yes!")
         else:
             click.echo("no :(")
 
     result = runner.invoke(test_no, input="y\n")
     assert not result.exception
-    assert result.output == "Foo [Y/n]: y\nyes!\n"
+    assert result.output == "Foo [y/N]: y\nyes!\n"
 
     result = runner.invoke(test_no, input="\n")
     assert not result.exception
-    assert result.output == "Foo [Y/n]: \nyes!\n"
+    assert result.output == "Foo [y/N]: \nno :(\n"
 
     result = runner.invoke(test_no, input="n\n")
     assert not result.exception
-    assert result.output == "Foo [Y/n]: n\nno :(\n"
+    assert result.output == "Foo [y/N]: n\nno :(\n"
 
 
 def test_confirm_repeat(runner):
@@ -212,6 +212,165 @@ def test_confirm_repeat(runner):
     )
     result = runner.invoke(cli, input="\ny\n")
     assert result.output == "A [y/n]: \nError: invalid input\nA [y/n]: y\n"
+
+
+class TestConfirmFunction:
+    """Test cases for click.confirm() function."""
+
+    def test_confirm_default_true(self, runner):
+        """Test confirm() with default=True (new default behavior)."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue?")
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="\n")
+        assert not result.exception
+        assert "Continue? [Y/n]: " in result.output
+        assert "result=True" in result.output
+
+    def test_confirm_default_false(self, runner):
+        """Test confirm() with explicit default=False."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue?", default=False)
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="\n")
+        assert not result.exception
+        assert "Continue? [y/N]: " in result.output
+        assert "result=False" in result.output
+
+    def test_confirm_default_none(self, runner):
+        """Test confirm() with default=None (requires explicit input)."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue?", default=None)
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="\ny\n")
+        assert not result.exception
+        assert "Continue? [y/n]: " in result.output
+        assert "Error: invalid input" in result.output
+        assert "result=True" in result.output
+
+    def test_confirm_input_yes(self, runner):
+        """Test confirm() with various 'yes' inputs."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Proceed?")
+            click.echo(f"result={result}")
+
+        for user_input in ["y", "Y", "yes", "YES", "Yes"]:
+            result = runner.invoke(cli, input=f"{user_input}\n")
+            assert not result.exception
+            assert "result=True" in result.output
+
+    def test_confirm_input_no(self, runner):
+        """Test confirm() with various 'no' inputs."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Proceed?")
+            click.echo(f"result={result}")
+
+        for user_input in ["n", "N", "no", "NO", "No"]:
+            result = runner.invoke(cli, input=f"{user_input}\n")
+            assert not result.exception
+            assert "result=False" in result.output
+
+    def test_confirm_abort_true_yes(self, runner):
+        """Test confirm() with abort=True and user answers yes."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Delete files?", abort=True)
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="y\n")
+        assert not result.exception
+        assert "result=True" in result.output
+
+    def test_confirm_abort_true_no(self, runner):
+        """Test confirm() with abort=True and user answers no (should abort)."""
+
+        @click.command()
+        def cli():
+            click.confirm("Delete files?", abort=True)
+            click.echo("This should not be printed")
+
+        result = runner.invoke(cli, input="n\n")
+        assert result.exit_code != 0
+        assert "This should not be printed" not in result.output
+
+    def test_confirm_show_default_false(self, runner):
+        """Test confirm() with show_default=False."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue?", show_default=False)
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="y\n")
+        assert not result.exception
+        assert "[Y/n]" not in result.output
+        assert "Continue?: " in result.output
+        assert "result=True" in result.output
+
+    def test_confirm_custom_prompt_suffix(self, runner):
+        """Test confirm() with custom prompt_suffix."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue", prompt_suffix="? ")
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="y\n")
+        assert not result.exception
+        assert "Continue [Y/n]? " in result.output
+        assert "result=True" in result.output
+
+    def test_confirm_empty_prompt_suffix(self, runner):
+        """Test confirm() with empty prompt_suffix."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue", prompt_suffix="")
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="y\n")
+        assert not result.exception
+        assert "Continue [Y/n]" in result.output
+        assert "result=True" in result.output
+
+    def test_confirm_invalid_input_retry(self, runner):
+        """Test confirm() retries on invalid input."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue?")
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="maybe\ny\n")
+        assert not result.exception
+        assert "Error: invalid input" in result.output
+        assert "result=True" in result.output
+
+    def test_confirm_with_whitespace_input(self, runner):
+        """Test confirm() with whitespace in input."""
+
+        @click.command()
+        def cli():
+            result = click.confirm("Continue?")
+            click.echo(f"result={result}")
+
+        result = runner.invoke(cli, input="  y  \n")
+        assert not result.exception
+        assert "result=True" in result.output
 
 
 @pytest.mark.skipif(WIN, reason="Different behavior on windows.")
@@ -502,26 +661,26 @@ def test_echo_writing_to_standard_error(capfd, monkeypatch):
     emulate_input("y\n")
     click.confirm("Prompt to stdin")
     out, err = capfd.readouterr()
-    assert out == "Prompt to stdin [y/N]: "
+    assert out == "Prompt to stdin [Y/n]: "
     assert err == ""
 
     emulate_input("y\n")
     click.confirm("Prompt to stdin with no suffix", prompt_suffix="")
     out, err = capfd.readouterr()
-    assert out == "Prompt to stdin with no suffix [y/N]"
+    assert out == "Prompt to stdin with no suffix [Y/n]"
     assert err == ""
 
     emulate_input("y\n")
     click.confirm("Prompt to stderr", err=True)
     out, err = capfd.readouterr()
     assert out == " "
-    assert err == "Prompt to stderr [y/N]:"
+    assert err == "Prompt to stderr [Y/n]:"
 
     emulate_input("y\n")
     click.confirm("Prompt to stderr with no suffix", prompt_suffix="", err=True)
     out, err = capfd.readouterr()
     assert out == "]"
-    assert err == "Prompt to stderr with no suffix [y/N"
+    assert err == "Prompt to stderr with no suffix [Y/n"
 
     monkeypatch.setattr(click.termui, "isatty", lambda x: True)
     monkeypatch.setattr(click.termui, "getchar", lambda: " ")
